@@ -1,0 +1,10 @@
+{
+  "iconDefinitions": {
+    "_joeizor": {
+      "iconPath": "./joeizor.png"
+    }
+  },
+  "fileExtensions": {
+    "je": "_joeizor"
+  }
+}

@@ -1,0 +1,84 @@
+{
+  "scopeName": "source.joeizor",
+  "patterns": [
+    { "include": "#comments" },
+    { "include": "#strings" },
+    { "include": "#constants" },
+    { "include": "#keywords" },
+    { "include": "#functions" },
+    { "include": "#numbers" }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.double-slash.ruby",
+          "match": "//.*$"
+        }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        {
+          "name": "string.quoted.double.ruby",
+          "begin": "\"",
+          "end": "\"",
+          "patterns": [
+            {
+              "name": "constant.character.escape.ruby",
+              "match": "\\\\."
+            },
+            {
+              "name": "variable.interpolation.ruby",
+              "match": "\\{[^}]+\\}"
+            }
+          ]
+        }
+      ]
+    },
+    "constants": {
+      "patterns": [
+        {
+          "name": "constant.other.ruby",
+          "match": "\\b[A-Z][A-Z0-9_]*\\b"
+        }
+      ]
+    },
+    "keywords": {
+      "patterns": [
+        {
+          "name": "keyword.control.ruby",
+          "match": "\\b(?:func|class|extends|end|if|else|for|in|while|do|state|new|true|false)\\b"
+        },
+        {
+          "name": "storage.type.ruby",
+          "match": "\\b(?:text|sec|navig|btn|input|img)\\b"
+        },
+        {
+          "name": "variable.parameter.ruby",
+          "match": "\\b(?:self|this)\\b"
+        }
+      ]
+    },
+    "functions": {
+      "patterns": [
+        {
+          "name": "entity.name.function.ruby",
+          "match": "(?<=\\bfunc\\s)[A-Za-z_][A-Za-z0-9_]*|\\b[A-Za-z_][A-Za-z0-9_]*(?=\\s*\\()"
+        },
+        {
+          "name": "variable.other.readwrite.ruby",
+          "match": "\\b[a-z_][A-Za-z0-9_]*\\b"
+        }
+      ]
+    },
+    "numbers": {
+      "patterns": [
+        {
+          "name": "constant.numeric.ruby",
+          "match": "\\b\\d+(?:\\.\\d+)?\\b"
+        }
+      ]
+    }
+  }
+}

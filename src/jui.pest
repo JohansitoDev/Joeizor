@@ -1,0 +1,36 @@
+WHITESPACE = _{ " " | "\t" | "\r" | "\n" | line_comment }
+line_comment = _{ "//" ~ (!"\n" ~ ANY)* }
+
+program = { SOI ~ statement* ~ EOI }
+statement = { class_decl | method_call | instance_decl | function_decl | function_call | state_decl | constant_decl | variable_decl | if_stmt | for_stmt | while_stmt | do_while_stmt | text_element | section_element | navig_element | navig_short }
+
+class_decl = { "class" ~ identifier ~ ("extends" ~ identifier)? ~ statement* ~ "end" }
+method_call = { identifier ~ "." ~ identifier ~ "(" ~ ")" }
+instance_decl = { identifier ~ "=" ~ "new" ~ identifier ~ "(" ~ ")" }
+function_decl = { "func" ~ identifier ~ "(" ~ parameter_list? ~ ")" ~ statement* ~ "end" }
+function_call = { identifier ~ "(" ~ ")" }
+parameter_list = { identifier ~ ("," ~ identifier)* }
+state_decl = { "state" ~ identifier ~ "=" ~ value }
+constant_decl = { constant_name ~ "=" ~ value }
+variable_decl = { identifier ~ "=" ~ value }
+if_stmt = { "if" ~ condition ~ statement* ~ else_if_clause* ~ else_clause? ~ "end" }
+else_if_clause = { "else" ~ "if" ~ condition ~ statement* }
+else_clause = { "else" ~ statement* }
+for_stmt = { "for" ~ identifier ~ "in" ~ identifier ~ statement* ~ "end" }
+while_stmt = { "while" ~ condition ~ statement* ~ "end" }
+do_while_stmt = { "do" ~ statement* ~ "end" ~ "while" ~ condition }
+
+text_element = { "text" ~ attribute* ~ string ~ "end" }
+section_element = { "sec" ~ attribute* ~ statement* ~ "end" }
+navig_element = { "navig" ~ "to" ~ "=" ~ string ~ attribute* ~ statement* ~ "end" }
+navig_short = { "navig" ~ string ~ "end" }
+attribute = { identifier ~ "=" ~ string }
+
+condition = { identifier | boolean }
+value = { string | number | boolean | array | identifier }
+array = { "[" ~ (value ~ ("," ~ value)*)? ~ "]" }
+string = @{ "\"" ~ ("\\" ~ ANY | !("\"") ~ ANY)* ~ "\"" }
+number = @{ "-"? ~ ASCII_DIGIT+ ~ ("." ~ ASCII_DIGIT+)? }
+boolean = { "true" | "false" }
+identifier = @{ (ASCII_ALPHA | "_") ~ (ASCII_ALPHANUMERIC | "_")* }
+constant_name = @{ ASCII_ALPHA_UPPER ~ (ASCII_ALPHANUMERIC | "_")* }

@@ -1,0 +1,45 @@
+{
+  "name": "joeizor-language",
+  "displayName": "Joeizor Language",
+  "description": "Lenguaje .je con sintaxis Ruby. Creado por Johan Antinio Mancebo Lebron.",
+  "version": "0.1.0",
+  "publisher": "joeizor",
+  "license": "MIT",
+  "icon": "joeizor.png",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Themes"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "joeizor",
+        "aliases": [
+          "Joeizor",
+          "Joeizor .je"
+        ],
+        "extensions": [
+          ".je"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "joeizor",
+        "scopeName": "source.joeizor",
+        "path": "./syntaxes/joeizor.tmLanguage.json"
+      }
+    ],
+    "iconThemes": [
+      {
+        "id": "joeizor-file-icons",
+        "label": "Joeizor File Icons",
+        "path": "./themes/joeizor-icon-theme.json"
+      }
+    ]
+  }
+}

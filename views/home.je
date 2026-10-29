@@ -1,0 +1,56 @@
+state count = 0
+isLogged = true
+name = "Johan"
+PI = 3.1416
+users = ["Ana", "Luis", "Marta"]
+
+class Animal
+  func speak()
+    text class="text-muted" "Sonido del animal base" end
+  end
+end
+
+class Cat extends Animal
+  func speak()
+    text class="text-primary fw-semibold" "Polimorfismo: Joeizor puede sobrescribir metodos" end
+  end
+end
+
+cat = new Cat()
+
+func Greeting()
+  text class="display-5 fw-bold text-primary" "Hola, {name}" end
+end
+
+sec class="container py-5"
+  sec class="row justify-content-center"
+    sec class="col-lg-8"
+      sec class="card shadow-sm border-0"
+        sec class="card-body p-4 p-md-5"
+          Greeting()
+          text class="lead text-secondary mt-3" "Una interfaz escrita en .je, compilada con Rust y renderizada en el navegador." end
+          sec class="d-flex flex-wrap gap-2 mt-4"
+            navig to="/dashboard" class="btn btn-primary"
+              text "Abrir dashboard" end
+            end
+            text class="btn btn-outline-secondary" "Bootstrap + Joeizor" end
+          end
+          sec class="mt-4"
+            text class="h5" "Lista renderizada con for:" end
+            for user in users
+              text class="badge text-bg-light border me-2 mb-2" "{user}" end
+            end
+          end
+          if count
+            text class="alert alert-success mt-3" "El contador tiene valor." end
+          else if isLogged
+            text class="alert alert-info mt-3" "Bienvenido, {name}. PI = {PI}" end
+          else
+            text class="alert alert-warning mt-3" "Inicia sesion para continuar." end
+          end
+          cat.speak()
+        end
+      end
+    end
+  end
+end
