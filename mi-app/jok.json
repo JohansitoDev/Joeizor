@@ -1,7 +1,8 @@
 {
   "name": "mi-app",
-  "author": "Johan Antinio Mancebo Lebron",
+  "author": "Johan Antonio Mancebo Lebron",
   "backend": "main.jok",
   "entry": "views/home.je",
-  "description": "Creado por Johan Antinio Mancebo Lebron"
+  "description": "Creado por Johan Antonio Mancebo Lebron"
 }
+
