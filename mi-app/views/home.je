@@ -1,4 +1,8 @@
+imp Navbar from "components/Navbar"
+imp Counter from "components/Counter"
+
 state count = 0
+state inputName = ""
 isLogged = true
 name = "Johan"
 PI = 3.1416
@@ -6,55 +10,67 @@ users = ["Ana", "Luis", "Marta"]
 
 class Animal
   func speak()
-    text class="text-muted" "Sonido del animal base" end
+    text class="text-slate-500" "Sonido del animal base" end
   end
 end
 
 class Cat extends Animal
   func speak()
-    text class="text-primary fw-semibold" " Joeizor" end
+    text class="font-semibold text-indigo-700" "Joeizor permite sobrescribir metodos" end
   end
 end
 
 cat = new Cat()
 
 func Greeting()
-  text class="display-5 fw-bold text-primary" "Hola, {name}" end
+  text class="text-4xl font-bold tracking-tight text-slate-900" "Hola, {name}" end
 end
 
-sec class="container py-5"
-  sec class="row justify-content-center"
-    sec class="col-lg-8"
-      sec class="card shadow-sm border-0"
-        sec class="card-body p-4 p-md-5"
-          Greeting()
-          text class="lead text-secondary mt-3" "Una interfaz escrita en .je, compilada con Rust y renderizada en el navegador." end
-          sec class="d-flex align-items-center gap-3 mt-4"
-            text class="h5 mb-0" "Contador reactivo: {count}" end
-            btn class="btn btn-success" onClick={count++}
-              text "Sumar" end
-            end
+Navbar()
+
+sec class="mx-auto max-w-5xl px-6 py-12"
+  sec class="rounded-3xl bg-white p-8 shadow-xl ring-1 ring-slate-200"
+    Greeting()
+    text class="mt-3 text-lg text-slate-600" "Una interfaz en .je, compilada con Rust y renderizada en el navegador." end
+    sec class="mt-8 grid gap-4 md:grid-cols-2"
+      Counter()
+      Counter()
+    end
+    sec class="mt-8 flex flex-wrap items-center gap-3"
+      text class="font-medium text-slate-700" "Contador de la página: {count}" end
+      btn class="rounded-lg bg-emerald-600 px-4 py-2 font-semibold text-white hover:bg-emerald-700" onClick={count++}
+        text "Sumar" end
+      end
+    end
+    if count
+      text class="mt-4 rounded-lg bg-emerald-50 p-4 text-emerald-800" "El contador tiene valor." end
+    else if isLogged
+      text class="mt-4 rounded-lg bg-indigo-50 p-4 text-indigo-800" "Bienvenido, {name}. PI = {PI}" end
+    else
+      text class="mt-4 rounded-lg bg-amber-50 p-4 text-amber-800" "Inicia sesion para continuar." end
+    end
+    cat.speak()
+  end
+end
+
+bl
+
+sec class="mx-auto max-w-5xl px-6 pb-12"
+  sec class="grid gap-8 rounded-3xl bg-white p-8 shadow-xl ring-1 ring-slate-200 md:grid-cols-2"
+    sec
+      text class="text-2xl font-semibold text-slate-900" "Formulario reactivo" end
+      input class="mt-4 w-full rounded-xl border border-slate-300 px-4 py-3 text-slate-900 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200" type="text" placeholder="Escribe tu nombre" bind={inputName} end
+      if inputName
+        text class="mt-3 text-indigo-700" "Hola, {inputName}" end
+      end
+    end
+    sec
+      text class="text-2xl font-semibold text-slate-900" "Lista de usuarios" end
+      list class="mt-4 space-y-2"
+        for user in users
+          item class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-700"
+            text "{user}" end
           end
-          sec class="d-flex flex-wrap gap-2 mt-4"
-            navig to="/dashboard" class="btn btn-primary"
-              text "Abrir dashboard" end
-            end
-            text class="btn btn-outline-secondary" "Bootstrap + Joeizor" end
-          end
-          sec class="mt-4"
-            text class="h5" "Lista renderizada con for:" end
-            for user in users
-              text class="badge text-bg-light border me-2 mb-2" "{user}" end
-            end
-          end
-          if count
-            text class="alert alert-success mt-3" "El contador tiene valor." end
-          else if isLogged
-            text class="alert alert-info mt-3" "Bienvenido, {name}. PI = {PI}" end
-          else
-            text class="alert alert-warning mt-3" "Inicia sesion para continuar." end
-          end
-          cat.speak()
         end
       end
     end

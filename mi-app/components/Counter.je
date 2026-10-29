@@ -1,0 +1,9 @@
+state count = 0
+
+sec class="rounded-2xl border border-slate-200 bg-slate-50 p-6"
+  text class="text-sm font-medium text-slate-500" "Contador independiente" end
+  text class="mt-2 text-3xl font-bold text-slate-900" "{count}" end
+  btn class="mt-4 rounded-lg bg-indigo-600 px-4 py-2 font-semibold text-white hover:bg-indigo-700" onClick={count++}
+    text "Sumar" end
+  end
+end

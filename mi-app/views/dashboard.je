@@ -1,11 +1,18 @@
-sec class="container mt-5"
-  sec class="card shadow-sm"
-    sec class="card-body"
-      text class="h1 text-primary" "Dashboard Joeizor" end
-      text class="lead" "Este es dashboard de este sitio web de prueba con bootstrap " end
-      navig to="/" class="text-primary"
-        text "Volver al inicio" end
-      end
+imp Navbar from "components/Navbar"
+imp Counter from "components/Counter"
+
+Navbar()
+
+sec class="mx-auto max-w-5xl px-6 py-12"
+  sec class="rounded-3xl bg-white p-8 shadow-xl ring-1 ring-slate-200"
+    text class="text-4xl font-bold text-slate-900" "Dashboard Joeizor" end
+    text class="mt-3 text-lg text-slate-600" "Esta página está en views/dashboard.je." end
+    bl
+    sec class="mt-8 max-w-md"
+      Counter()
+    end
+    navig to="/" class="mt-8 inline-flex rounded-lg bg-indigo-600 px-4 py-2 font-semibold text-white hover:bg-indigo-700"
+      text "Volver al inicio" end
     end
   end
 end
