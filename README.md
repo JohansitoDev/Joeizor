@@ -39,19 +39,23 @@ Set-Location mi-app
 cargo +stable-x86_64-pc-windows-gnu run --manifest-path ..\Cargo.toml -- run
 ```
 
-Abre `http://localhost:5173`. El comando `run` construye el runtime WASM,
-inicia el servidor frontend y abre el navegador. Si `main.jok` contiene código,
-también intenta iniciar el backend con `jok run`. Para levantar solo el
-frontend, usa `dev` en lugar de `run`:
+El comando `run` construye el runtime WASM, inicia el servidor frontend e
+imprime la URL en la terminal antes de abrirla en el navegador (normalmente
+`http://localhost:5173`). Si ese puerto está ocupado, prueba automáticamente
+los siguientes 100 y, si hace falta, solicita un puerto libre al sistema. Si
+`main.jok` contiene código, también intenta iniciar el backend con `jok run`.
+Para levantar solo el frontend, usa `dev` en lugar de `run`:
 
 ```powershell
 cargo +stable-x86_64-pc-windows-gnu run --manifest-path ..\Cargo.toml -- dev
 ```
 
-El servidor detecta cambios en archivos `.je` con un sondeo de 25 ms y envía
-invalidaciones por WebSocket. El navegador vuelve a importar la vista activa
-sin recargar el documento y conserva los valores declarados con `state`. El
-tiempo total de recompilación depende del tamaño del proyecto y del equipo.
+El servidor empieza a observar los archivos `.je` de `views/` al arrancar.
+Detecta cambios con un sondeo de 25 ms y envía invalidaciones por WebSocket,
+también cuando se usa un puerto alternativo. El navegador vuelve a importar la
+vista activa sin recargar el documento y conserva los valores declarados con
+`state`. El tiempo total de recompilación depende del tamaño del proyecto y
+del equipo.
 
 ### Instalar el CLI desde este repositorio
 

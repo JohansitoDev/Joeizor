@@ -15,13 +15,19 @@ use sha1::{Digest, Sha1};
 
 use crate::{compiler, parser};
 
+const DEFAULT_DEV_PORT: u16 = 5173;
+const DEV_PORT_RANGE: u16 = 100;
+
 pub fn serve(root: PathBuf, run_backend: bool) -> Result<(), String> {
     let root = root
         .canonicalize()
         .map_err(|error| format!("no se pudo abrir {}: {error}", root.display()))?;
     build_wasm(&root)?;
-    let listener = TcpListener::bind(("127.0.0.1", 5173))
-        .map_err(|error| format!("no se pudo iniciar http://localhost:5173: {error}"))?;
+    let listener = bind_dev_server()?;
+    let port = listener
+        .local_addr()
+        .map_err(|error| format!("no se pudo consultar el puerto del servidor: {error}"))?
+        .port();
     let _backend = if run_backend {
         start_backend(&root)?
     } else {
@@ -30,8 +36,9 @@ pub fn serve(root: PathBuf, run_backend: bool) -> Result<(), String> {
     let generation = Arc::new(AtomicU64::new(0));
     watch_files(root.clone(), Arc::clone(&generation));
 
-    println!("Joeizor disponible en http://localhost:5173");
-    open_browser();
+    let url = format!("http://localhost:{port}");
+    println!("Joeizor disponible en {url}");
+    open_browser(&url);
     for connection in listener.incoming() {
         match connection {
             Ok(stream) => {
@@ -47,6 +54,31 @@ pub fn serve(root: PathBuf, run_backend: bool) -> Result<(), String> {
         }
     }
     Ok(())
+}
+
+fn bind_dev_server() -> Result<TcpListener, String> {
+    let last_port = DEFAULT_DEV_PORT.saturating_add(DEV_PORT_RANGE);
+    if let Some(listener) = bind_available_port(DEFAULT_DEV_PORT, last_port)? {
+        return Ok(listener);
+    }
+
+    TcpListener::bind(("127.0.0.1", 0))
+        .map_err(|error| format!("no se pudo iniciar el servidor en un puerto disponible: {error}"))
+}
+
+fn bind_available_port(first_port: u16, last_port: u16) -> Result<Option<TcpListener>, String> {
+    for port in first_port..=last_port {
+        match TcpListener::bind(("127.0.0.1", port)) {
+            Ok(listener) => return Ok(Some(listener)),
+            Err(error) if error.kind() == ErrorKind::AddrInUse => {}
+            Err(error) => {
+                return Err(format!(
+                    "no se pudo iniciar el servidor en el puerto {port}: {error}"
+                ));
+            }
+        }
+    }
+    Ok(None)
 }
 
 fn start_backend(root: &Path) -> Result<Option<Child>, String> {
@@ -316,7 +348,26 @@ fn send_frame(stream: &mut TcpStream, opcode: u8, payload: &[u8]) -> Result<(), 
 
 #[cfg(test)]
 mod tests {
-    use super::websocket_accept;
+    use std::net::TcpListener;
+
+    use super::{bind_available_port, websocket_accept};
+
+    #[test]
+    fn selects_the_next_available_port_when_a_port_is_occupied() {
+        let occupied = TcpListener::bind(("127.0.0.1", 0)).expect("puerto efimero disponible");
+        let occupied_port = occupied.local_addr().expect("puerto ocupado").port();
+        let next_port = occupied_port.saturating_add(1);
+        let Some(listener) =
+            bind_available_port(occupied_port, next_port).expect("búsqueda de puerto disponible")
+        else {
+            assert_eq!(occupied_port, u16::MAX);
+            return;
+        };
+        let selected = listener.local_addr().expect("puerto local").port();
+
+        assert_eq!(selected, next_port);
+        drop(occupied);
+    }
 
     #[test]
     fn computes_rfc6455_accept_key() {
@@ -479,8 +530,8 @@ fn percent_decode(value: &str) -> String {
 }
 
 fn watch_files(root: PathBuf, generation: Arc<AtomicU64>) {
+    let mut previous = snapshot(&root);
     thread::spawn(move || {
-        let mut previous = snapshot(&root);
         loop {
             thread::sleep(Duration::from_millis(25));
             let current = snapshot(&root);
@@ -520,19 +571,15 @@ fn collect_files(directory: &Path, entries: &mut HashMap<PathBuf, (u64, Option<S
     }
 }
 
-fn open_browser() {
+fn open_browser(url: &str) {
     #[cfg(target_os = "windows")]
-    let result = Command::new("cmd")
-        .args(["/C", "start", "", "http://localhost:5173"])
-        .spawn();
+    let result = Command::new("cmd").args(["/C", "start", "", url]).spawn();
 
     #[cfg(target_os = "macos")]
-    let result = Command::new("open").arg("http://localhost:5173").spawn();
+    let result = Command::new("open").arg(url).spawn();
 
     #[cfg(all(unix, not(target_os = "macos")))]
-    let result = Command::new("xdg-open")
-        .arg("http://localhost:5173")
-        .spawn();
+    let result = Command::new("xdg-open").arg(url).spawn();
 
     if let Err(error) = result {
         eprintln!("jok-ui: no se pudo abrir el navegador automaticamente: {error}");

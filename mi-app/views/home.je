@@ -12,7 +12,7 @@ end
 
 class Cat extends Animal
   func speak()
-    text class="text-primary fw-semibold" "Polimorfismo: Joeizor puede sobrescribir metodos" end
+    text class="text-primary fw-semibold" " Joeizor" end
   end
 end
 

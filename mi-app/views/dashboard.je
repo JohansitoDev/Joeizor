@@ -1,9 +1,9 @@
-sec class="container py-5"
+sec class="container mt-5"
   sec class="card shadow-sm"
     sec class="card-body"
       text class="h1 text-primary" "Dashboard Joeizor" end
-      text class="lead" "Esta pagina se selecciona automaticamente desde views/dashboard.je." end
-      navig to="/" class="btn btn-outline-primary mt-3"
+      text class="lead" "Esta pagina se selecciona " end
+      navig to="/" class="text-primary"
         text "Volver al inicio" end
       end
     end
