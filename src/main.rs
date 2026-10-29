@@ -50,12 +50,17 @@ fn run() -> Result<(), String> {
             let root = PathBuf::from(args.next().unwrap_or_else(|| ".".to_owned()));
             dev::serve(root, command == "run")
         }
+        "wasm-build" => {
+            let root = PathBuf::from(args.next().unwrap_or_else(|| ".".to_owned()));
+            dev::build_wasm(&root)
+        }
         _ => {
             println!(
                 "Joeizor UI - compilador inicial de JOKOTIN UI\n\
                       Uso:\n\
                         jok-ui check [archivo.je]\n\
                         jok-ui build [archivo.je] [salida.js]\n\
+                        jok-ui wasm-build [proyecto]\n\
                         jok-ui dev\n\
                         jok-ui create <nombre>"
             );
@@ -88,6 +93,11 @@ fn create_project(name: &str) -> Result<(), String> {
         include_str!("../public/index.html"),
     )
     .map_err(|error| format!("no se pudo crear index.html: {error}"))?;
+    fs::write(
+        root.join(".gitignore"),
+        "/target/\n/.joeizor/\n/public/pkg/\n",
+    )
+    .map_err(|error| format!("no se pudo crear .gitignore: {error}"))?;
     fs::copy(
         Path::new(env!("CARGO_MANIFEST_DIR")).join("public/joeizor.png"),
         root.join("public/joeizor.png"),

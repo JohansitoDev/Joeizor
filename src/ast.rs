@@ -19,6 +19,10 @@ pub enum Node {
         content: String,
         attributes: Vec<Attribute>,
     },
+    Button {
+        children: Vec<Node>,
+        attributes: Vec<Attribute>,
+    },
     Section {
         children: Vec<Node>,
         attributes: Vec<Attribute>,

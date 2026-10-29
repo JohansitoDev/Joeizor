@@ -1,4 +1,6 @@
 /target/
 /dist/
+/public/pkg/
+/.joeizor/
 /node_modules/
 *.vsix

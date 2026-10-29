@@ -1,6 +1,7 @@
 use pest::Parser;
 use pest::iterators::Pair;
 use pest_derive::Parser;
+use std::collections::HashSet;
 
 use crate::ast::{Attribute, Node, Program, Value};
 
@@ -24,7 +25,95 @@ pub fn parse(source: &str) -> PairResult<Program> {
             }
         }
     }
+    validate_events(&program.nodes)?;
     Ok(program)
+}
+
+fn validate_events(nodes: &[Node]) -> PairResult<()> {
+    let states = collect_states(nodes);
+    validate_events_in(nodes, &states)
+}
+
+fn validate_events_in(nodes: &[Node], states: &HashSet<String>) -> PairResult<()> {
+    for node in nodes {
+        let attributes = match node {
+            Node::Text { attributes, .. }
+            | Node::Button { attributes, .. }
+            | Node::Section { attributes, .. }
+            | Node::Navig { attributes, .. } => attributes.as_slice(),
+            _ => &[],
+        };
+        for attribute in attributes
+            .iter()
+            .filter(|attribute| attribute.name.starts_with("on"))
+        {
+            if attribute.name != "onClick" {
+                return Err(format!(
+                    "evento no soportado: {}; usa onClick",
+                    attribute.name
+                ));
+            }
+            let state = attribute
+                .value
+                .strip_suffix("++")
+                .or_else(|| attribute.value.strip_suffix("--"))
+                .ok_or("onClick requiere una accion como {count++}")?;
+            if !states.contains(state) {
+                return Err(format!("onClick modifica el estado no declarado: {state}"));
+            }
+        }
+        match node {
+            Node::Section { children, .. }
+            | Node::Button { children, .. }
+            | Node::For { children, .. }
+            | Node::While { children, .. }
+            | Node::DoWhile { children, .. }
+            | Node::Function { children, .. }
+            | Node::Navig { children, .. } => validate_events_in(children, states)?,
+            Node::If {
+                branches,
+                otherwise,
+            } => {
+                for (_, children) in branches {
+                    validate_events_in(children, states)?;
+                }
+                validate_events_in(otherwise, states)?;
+            }
+            Node::Class { methods, .. } => validate_events_in(methods, states)?,
+            _ => {}
+        }
+    }
+    Ok(())
+}
+
+fn collect_states(nodes: &[Node]) -> HashSet<String> {
+    let mut states = HashSet::new();
+    for node in nodes {
+        match node {
+            Node::State { name, .. } => {
+                states.insert(name.clone());
+            }
+            Node::Section { children, .. }
+            | Node::Button { children, .. }
+            | Node::For { children, .. }
+            | Node::While { children, .. }
+            | Node::DoWhile { children, .. }
+            | Node::Navig { children, .. }
+            | Node::Function { children, .. } => states.extend(collect_states(children)),
+            Node::If {
+                branches,
+                otherwise,
+            } => {
+                for (_, children) in branches {
+                    states.extend(collect_states(children));
+                }
+                states.extend(collect_states(otherwise));
+            }
+            Node::Class { methods, .. } => states.extend(collect_states(methods)),
+            _ => {}
+        }
+    }
+    states
 }
 
 fn parse_node(pair: Pair<'_, Rule>) -> PairResult<Node> {
@@ -189,6 +278,21 @@ fn parse_node(pair: Pair<'_, Rule>) -> PairResult<Node> {
                 attributes,
             })
         }
+        Rule::button_element => {
+            let mut attributes = Vec::new();
+            let mut children = Vec::new();
+            for part in pair.into_inner() {
+                match part.as_rule() {
+                    Rule::attribute => attributes.push(parse_attribute(part)?),
+                    Rule::statement => children.push(parse_statement(part)?),
+                    _ => {}
+                }
+            }
+            Ok(Node::Button {
+                children,
+                attributes,
+            })
+        }
         Rule::section_element => {
             let mut attributes = Vec::new();
             let mut children = Vec::new();
@@ -295,7 +399,13 @@ fn parse_attribute(pair: Pair<'_, Rule>) -> PairResult<Attribute> {
         .ok_or("atributo sin nombre")?
         .as_str()
         .to_owned();
-    let value = unquote(inner.next().ok_or("atributo sin valor")?.as_str());
+    let value_pair = inner.next().ok_or("atributo sin valor")?;
+    let value = if value_pair.as_rule() == Rule::string {
+        unquote(value_pair.as_str())
+    } else {
+        let expression = value_pair.as_str();
+        expression[1..expression.len() - 1].to_owned()
+    };
     Ok(Attribute { name, value })
 }
 
@@ -402,5 +512,18 @@ mod tests {
         ));
         assert!(matches!(&program.nodes[5], Node::Instance { .. }));
         assert!(matches!(&program.nodes[6], Node::MethodCall { .. }));
+    }
+
+    #[test]
+    fn rejects_click_handlers_that_cannot_update_a_declared_state() {
+        let error = parse(
+            r#"
+                btn onClick={missing++}
+                    text "Bad handler" end
+                end
+            "#,
+        )
+        .expect_err("no debe aceptar referencias a estado inexistente");
+        assert!(error.contains("missing"));
     }
 }

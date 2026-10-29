@@ -29,6 +29,12 @@ sec class="container py-5"
         sec class="card-body p-4 p-md-5"
           Greeting()
           text class="lead text-secondary mt-3" "Una interfaz escrita en .je, compilada con Rust y renderizada en el navegador." end
+          sec class="d-flex align-items-center gap-3 mt-4"
+            text class="h5 mb-0" "Contador reactivo: {count}" end
+            btn class="btn btn-success" onClick={count++}
+              text "Sumar" end
+            end
+          end
           sec class="d-flex flex-wrap gap-2 mt-4"
             navig to="/dashboard" class="btn btn-primary"
               text "Abrir dashboard" end

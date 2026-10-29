@@ -2,7 +2,7 @@ WHITESPACE = _{ " " | "\t" | "\r" | "\n" | line_comment }
 line_comment = _{ "//" ~ (!"\n" ~ ANY)* }
 
 program = { SOI ~ statement* ~ EOI }
-statement = { class_decl | method_call | instance_decl | function_decl | function_call | state_decl | constant_decl | variable_decl | if_stmt | for_stmt | while_stmt | do_while_stmt | text_element | section_element | navig_element | navig_short }
+statement = { class_decl | method_call | instance_decl | function_decl | function_call | state_decl | constant_decl | variable_decl | if_stmt | for_stmt | while_stmt | do_while_stmt | text_element | button_element | section_element | navig_element | navig_short }
 
 class_decl = { "class" ~ identifier ~ ("extends" ~ identifier)? ~ statement* ~ "end" }
 method_call = { identifier ~ "." ~ identifier ~ "(" ~ ")" }
@@ -21,10 +21,12 @@ while_stmt = { "while" ~ condition ~ statement* ~ "end" }
 do_while_stmt = { "do" ~ statement* ~ "end" ~ "while" ~ condition }
 
 text_element = { "text" ~ attribute* ~ string ~ "end" }
+button_element = { "btn" ~ attribute* ~ statement* ~ "end" }
 section_element = { "sec" ~ attribute* ~ statement* ~ "end" }
 navig_element = { "navig" ~ "to" ~ "=" ~ string ~ attribute* ~ statement* ~ "end" }
 navig_short = { "navig" ~ string ~ "end" }
-attribute = { identifier ~ "=" ~ string }
+attribute = { identifier ~ "=" ~ (string | event_expression) }
+event_expression = { "{" ~ identifier ~ ("++" | "--") ~ "}" }
 
 condition = { identifier | boolean }
 value = { string | number | boolean | array | identifier }

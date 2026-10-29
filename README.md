@@ -1,31 +1,98 @@
 # Joeizor
 
-**Creado por Johan Antinio Mancebo Lebron.** Joeizor es una base para crear
-aplicaciones web con archivos `.je`, un compilador Rust que genera JavaScript
-DOM directo y un servidor local con rutas por archivo.
+**Creado por Johan Antinio Mancebo Lebron.**
+
+Joeizor es, a la vez, un **lenguaje de programación**, un **lenguaje de marcado
+de interfaces** y un **framework frontend**. Se escriben las vistas en `.je`,
+con sintaxis propia tipo Ruby, y el compilador/CLI está escrito en Rust. No
+necesitas escribir etiquetas HTML en las vistas Joeizor; `public/index.html`
+es solamente el documento anfitrión que carga la aplicación en el navegador.
 
 ## Requisitos
 
-- Rust y Cargo (edition 2024).
-- Un navegador moderno.
-- Conexion a Internet para cargar Bootstrap 5.3.8 desde jsDelivr.
+- Rust estable y Cargo (edition 2024).
+- Target `wasm32-unknown-unknown`.
+- `wasm-bindgen-cli` versión `0.2.129` para generar los archivos del runtime.
+- Navegador moderno.
+- Conexión a Internet para cargar Bootstrap 5.3.8 desde jsDelivr en el ejemplo.
 
-## Crear y ejecutar una app
+En Windows, los comandos de abajo usan el toolchain GNU, que evita depender de
+Visual C++ Build Tools. Si tienes ese toolchain, prepara WASM así:
 
 ```powershell
-cargo run -- create mi-app
-cd mi-app
-cargo run --manifest-path ..\Cargo.toml -- run
+rustup target add --toolchain stable-x86_64-pc-windows-gnu wasm32-unknown-unknown
+cargo +stable-x86_64-pc-windows-gnu install wasm-bindgen-cli --version 0.2.129
 ```
 
-El comando `run` levanta el servidor en `http://localhost:5173` y abre el
-navegador. Al guardar archivos `.je`, el compilador los vuelve a procesar y el
-navegador importa de nuevo el modulo de la ruta actual sin refrescar el
-documento completo. El observador revisa cambios cada 25 ms. `run` tambien
-intenta iniciar `jok run` si encuentra un `main.jok` con contenido; `dev` solo
-ejecuta el frontend.
+La instalación de `wasm-bindgen-cli` en Windows también requiere herramientas
+de enlace compatibles. Si falla por falta de `dlltool`, instala GNU Binutils o
+descarga el binario oficial `wasm-bindgen` versión `0.2.129` y colócalo en
+`%USERPROFILE%\.cargo\bin`.
 
-## Rutas y archivos
+## Crear y ejecutar una aplicación
+
+Desde la raíz de este repositorio, en PowerShell:
+
+```powershell
+cargo +stable-x86_64-pc-windows-gnu run -- create mi-app
+Set-Location mi-app
+cargo +stable-x86_64-pc-windows-gnu run --manifest-path ..\Cargo.toml -- run
+```
+
+Abre `http://localhost:5173`. El comando `run` construye el runtime WASM,
+inicia el servidor frontend y abre el navegador. Si `main.jok` contiene código,
+también intenta iniciar el backend con `jok run`. Para levantar solo el
+frontend, usa `dev` en lugar de `run`:
+
+```powershell
+cargo +stable-x86_64-pc-windows-gnu run --manifest-path ..\Cargo.toml -- dev
+```
+
+El servidor detecta cambios en archivos `.je` con un sondeo de 25 ms y envía
+invalidaciones por WebSocket. El navegador vuelve a importar la vista activa
+sin recargar el documento y conserva los valores declarados con `state`. El
+tiempo total de recompilación depende del tamaño del proyecto y del equipo.
+
+### Instalar el CLI desde este repositorio
+
+También puedes instalar el ejecutable `jok-ui` en Cargo:
+
+```powershell
+cargo +stable-x86_64-pc-windows-gnu install --path . --locked
+jok-ui create mi-app
+Set-Location mi-app
+jok-ui run
+```
+
+Para comprobar o compilar vistas del proyecto actual:
+
+```powershell
+jok-ui check views\home.je
+jok-ui build views\home.je dist\app.js
+jok-ui wasm-build
+jok-ui dev
+jok-ui run
+```
+
+Si Visual C++ Build Tools está instalado, puedes omitir
+`+stable-x86_64-pc-windows-gnu` de los comandos `cargo`. En macOS y Linux usa
+`cargo` directamente.
+
+## Estructura de una aplicación
+
+`jok-ui create mi-app` crea una estructura inicial como esta:
+
+```text
+mi-app/
+├── main.jok
+├── jok.json
+├── public/
+│   ├── index.html
+│   └── joeizor.png
+└── views/
+    ├── home.je
+    └── dashboard.je
+```
 
 Las rutas web se derivan de los nombres de archivo:
 
@@ -35,93 +102,96 @@ Las rutas web se derivan de los nombres de archivo:
 | `views/dashboard.je` | `/dashboard` |
 | `views/admin/users.je` | `/admin/users` |
 
-Usa `navig to="/dashboard" ... end` para enlazar rutas. Cada destino debe tener
-el archivo `.je` correspondiente. `public/index.html` es el documento anfitrion
-y `public/` sirve imagenes y otros recursos estaticos.
+Usa `navig to="/dashboard" ... end` para enlazar páginas. Cada destino debe
+tener su archivo `.je` en `views/`. El compilador genera
+`public/pkg/joeizor_ui.js` y `public/pkg/joeizor_ui_bg.wasm` al ejecutar `run`,
+`dev` o `wasm-build`.
 
-## Comandos
-
-Desde el repositorio de Joeizor:
-
-```powershell
-cargo run -- check views\home.je
-cargo run -- build views\home.je dist\app.js
-cargo run -- dev
-cargo test
-```
-
-`jok-ui dev` sirve la carpeta actual en el puerto 5173. `jok-ui run` tambien
-inicia el backend Jokotin cuando detecta codigo en `main.jok`.
-
-## Lenguaje `.je`
+## Sintaxis `.je`
 
 ```je
 state count = 0
 name = "Johan"
 PI = 3.1416
-users = ["Ana", "Luis"]
+users = ["Ana", "Luis", "Marta"]
 
-class Animal
-  func speak()
-    text "Sonido base" end
-  end
+func Greeting()
+  text class="display-5 fw-bold text-primary" "Hola, {name}" end
 end
 
-class Cat extends Animal
-  func speak()
-    text class="text-primary" "Metodo sobrescrito" end
+sec class="container py-5"
+  Greeting()
+  text class="lead" "Contador: {count}" end
+
+  btn class="btn btn-success" onClick={count++}
+    text "Sumar" end
   end
-end
 
-cat = new Cat()
-cat.speak()
+  navig to="/dashboard" class="btn btn-primary"
+    text "Abrir dashboard" end
+  end
 
-sec class="container"
   for user in users
     text class="badge text-bg-light" "Hola {user}" end
   end
+
   if count
-    text "Con valor" end
+    text "El contador tiene valor." end
   else if name
     text "Hola {name}" end
   else
     text "Sin nombre" end
   end
-  while count
-    text "Mientras la condicion sea verdadera" end
-  end
-  do
-    text "El bloque do se ejecuta al menos una vez" end
-  end while count
 end
 ```
 
-`while` y `do ... end while condicion` compilan a bucles JavaScript. Las clases
-usan `extends` y los metodos de JavaScript; sobrescribir un metodo en una clase
-hija permite despacho polimorfico. Las variables llevan nombre en minusculas y
-las constantes en mayusculas.
+`state` crea una señal alojada en WASM. Las interpolaciones actualizan el nodo
+de texto afectado y las condiciones reactivas actualizan su propio fragmento.
+También se admiten variables, constantes, funciones/componentes, clases con
+`extends`, métodos sobrescritos, `while` y `do ... end while`.
 
-## Extension de VS Code e icono
+## GitHub y estadísticas de lenguaje
 
-La extension local esta en
+El repositorio incluye `.gitattributes` para clasificar los archivos `.je` como
+`Joeizor` cuando GitHub Linguist reconozca el lenguaje. La barra **Languages**
+de GitHub calcula el porcentaje según los bytes de código de cada lenguaje;
+no es una métrica de instalaciones ni de uso de Joeizor en todo GitHub.
+
+**Importante:** Joeizor todavía no está registrado en el catálogo de GitHub
+Linguist. GitHub no incluye en las estadísticas un lenguaje que no aparezca en
+ese catálogo, así que `.gitattributes` por sí solo no puede hacer aparecer
+ahora mismo el nombre o su porcentaje. Para habilitarlo en GitHub hay que
+proponer la extensión `.je` como nuevo lenguaje en
+[github-linguist/linguist](https://github.com/github-linguist/linguist) y
+esperar a que acepten y publiquen ese cambio. La configuración local ya queda
+preparada para cuando Linguist lo incorpore.
+
+## Extensión de VS Code e icono
+
+La extensión local está en
 [`extensions/joeizor-vscode`](./extensions/joeizor-vscode). Reconoce `.je`,
-usa scopes TextMate compatibles con los colores Ruby del tema instalado, y
-ofrece el tema `Joeizor File Icons` con el icono adjunto. Para desarrollo,
-abre el proyecto en VS Code y ejecuta **Debug: Start Debugging** con una
-configuracion de Extension Host. Para distribuir un `.vsix`, empaqueta esa
-carpeta con `@vscode/vsce`; luego activa `Joeizor File Icons` como tema de
-iconos de archivos.
+usa scopes TextMate compatibles con los colores Ruby del tema instalado y
+ofrece el tema `Joeizor File Icons` con el icono del proyecto. Instálala con:
 
-## Ejemplo Bootstrap
+```powershell
+code --install-extension .\extensions\joeizor-vscode\joeizor-language-0.1.0.vsix
+```
 
-`views/home.je` y `views/dashboard.je` forman el ejemplo de prueba. La pagina
-incluye Bootstrap 5.3.8 por CDN, enlaces SPA, clases `container`, `card`,
-`btn`, `alert` y `badge`, estructuras de control e herencia.
+Los colores de `.je` se detectan automáticamente; para el icono, selecciona
+`Joeizor File Icons` en **Preferences: File Icon Theme**. La extensión todavía
+no está publicada en Visual Studio Marketplace. Publicarla requiere una cuenta
+Publisher y un token de acceso de Marketplace.
 
-## Alcance actual
+## Ejemplo Bootstrap y alcance actual
 
-Esta version inicial compila `.je` a JavaScript y actualiza las rutas en el
-navegador. El CSS de Bootstrap se carga por CDN; el compilador no descarga ni
-purga Bootstrap o Tailwind. La recarga no conserva actualmente el estado de runtime. El runtime WASM y la
-reactividad granular son trabajo pendiente, no funciones incluidas en este
-prototipo.
+`views/home.je` y `views/dashboard.je` son ejemplos funcionales con clases
+Bootstrap 5.3.8, enlaces SPA, estado reactivo, eventos, bucles y condiciones.
+Bootstrap se carga desde CDN. Aunque puedes escribir clases Bootstrap en
+`class=""`, el compilador todavía no descarga ni purga Bootstrap o Tailwind y
+no incluye un bundler completo.
+
+El runtime WASM utiliza `wasm-bindgen`/`web-sys` para señales y operaciones DOM;
+el compilador Rust genera los módulos JavaScript de las vistas. HMR conserva
+las señales de `state`, pero no las instancias DOM ni estado local fuera de
+`state`. Este proyecto es una base funcional en desarrollo, no una
+implementación completa de todas las características de un lenguaje general.

@@ -1,6 +1,7 @@
 use std::collections::HashMap;
+use std::env;
 use std::fs;
-use std::io::{Read, Write};
+use std::io::{ErrorKind, Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::path::{Component, Path, PathBuf};
 use std::process::{Child, Command, Stdio};
@@ -9,12 +10,16 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::thread;
 use std::time::{Duration, SystemTime};
 
+use base64::Engine;
+use sha1::{Digest, Sha1};
+
 use crate::{compiler, parser};
 
 pub fn serve(root: PathBuf, run_backend: bool) -> Result<(), String> {
     let root = root
         .canonicalize()
         .map_err(|error| format!("no se pudo abrir {}: {error}", root.display()))?;
+    build_wasm(&root)?;
     let listener = TcpListener::bind(("127.0.0.1", 5173))
         .map_err(|error| format!("no se pudo iniciar http://localhost:5173: {error}"))?;
     let _backend = if run_backend {
@@ -87,32 +92,22 @@ fn handle_request(
     }
 
     let (path, query) = target.split_once('?').unwrap_or((target, ""));
+    if path == "/__joeizor/ws"
+        && request
+            .lines()
+            .any(|line| line.eq_ignore_ascii_case("upgrade: websocket"))
+    {
+        return handle_websocket(stream, &request, generation);
+    }
     if path == "/__joeizor/app.js" {
-        let route = query_value(query, "route").unwrap_or("/");
-        return match render_route(root, route) {
+        let route = query_value(query, "route").unwrap_or_else(|| "/".to_owned());
+        return match render_route(root, &route) {
             Ok(js) => respond(&mut stream, 200, "text/javascript; charset=utf-8", &js),
             Err((status, error)) => {
                 respond(&mut stream, status, "text/plain; charset=utf-8", &error)
             }
         };
     }
-    if path == "/__joeizor/events" {
-        let previous = generation.load(Ordering::Acquire);
-        for _ in 0..250 {
-            thread::sleep(Duration::from_millis(100));
-            let current = generation.load(Ordering::Acquire);
-            if current != previous {
-                return respond(
-                    &mut stream,
-                    200,
-                    "text/event-stream",
-                    &format!("data: {current}\n\n"),
-                );
-            }
-        }
-        return respond(&mut stream, 200, "text/event-stream", ": keep-alive\n\n");
-    }
-
     let decoded_path = percent_decode(path);
     let relative = if decoded_path == "/" || Path::new(&decoded_path).extension().is_none() {
         "index.html"
@@ -120,6 +115,216 @@ fn handle_request(
         decoded_path.trim_start_matches('/')
     };
     serve_public_file(&mut stream, root, relative)
+}
+
+pub fn build_wasm(root: &Path) -> Result<(), String> {
+    let manifest = Path::new(env!("CARGO_MANIFEST_DIR")).join("Cargo.toml");
+    let target_dir = root.join(".joeizor/target");
+    let wasm = target_dir.join("wasm32-unknown-unknown/release/joeizor_ui.wasm");
+    let output_dir = root.join("public/pkg");
+    fs::create_dir_all(&output_dir)
+        .map_err(|error| format!("no se pudo crear {}: {error}", output_dir.display()))?;
+
+    let mut cargo = cargo_command();
+    cargo
+        .args([
+            "build",
+            "--release",
+            "--lib",
+            "--target",
+            "wasm32-unknown-unknown",
+            "--target-dir",
+        ])
+        .arg(&target_dir)
+        .arg("--manifest-path")
+        .arg(&manifest);
+    run_command(
+        &mut cargo,
+        "compilacion WASM; instala el target con `rustup target add wasm32-unknown-unknown`",
+    )?;
+    run_command(
+        wasm_bindgen_command()
+            .arg(&wasm)
+            .args(["--target", "web", "--out-dir"])
+            .arg(&output_dir)
+            .args(["--out-name", "joeizor_ui"]),
+        "generacion del glue JS; instala wasm-bindgen-cli con `cargo install wasm-bindgen-cli`",
+    )?;
+    let wasm_size = fs::metadata(output_dir.join("joeizor_ui_bg.wasm"))
+        .map_err(|error| format!("no se pudo medir el modulo WASM generado: {error}"))?
+        .len();
+    println!("Runtime WASM listo: {wasm_size} bytes");
+    Ok(())
+}
+
+fn cargo_command() -> Command {
+    let mut command = Command::new("cargo");
+    if cfg!(windows) {
+        let has_gnu_toolchain = Command::new("rustup")
+            .args(["toolchain", "list"])
+            .output()
+            .ok()
+            .is_some_and(|output| {
+                String::from_utf8_lossy(&output.stdout)
+                    .lines()
+                    .any(|line| line.starts_with("stable-x86_64-pc-windows-gnu"))
+            });
+        if has_gnu_toolchain {
+            command.arg("+stable-x86_64-pc-windows-gnu");
+        }
+    }
+    command
+}
+
+fn wasm_bindgen_command() -> Command {
+    let executable = if cfg!(windows) {
+        "wasm-bindgen.exe"
+    } else {
+        "wasm-bindgen"
+    };
+    let cargo_bin = env::var_os("CARGO_HOME")
+        .map(PathBuf::from)
+        .or_else(|| env::var_os("USERPROFILE").map(|home| PathBuf::from(home).join(".cargo")))
+        .map(|home| home.join("bin").join(executable));
+    if let Some(path) = cargo_bin.filter(|path| path.is_file()) {
+        Command::new(path)
+    } else {
+        Command::new("wasm-bindgen")
+    }
+}
+
+fn run_command(command: &mut Command, failure: &str) -> Result<(), String> {
+    let output = command
+        .output()
+        .map_err(|error| format!("{failure}: {error}"))?;
+    if output.status.success() {
+        return Ok(());
+    }
+    Err(format!(
+        "{failure}.\n{}{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    ))
+}
+
+fn handle_websocket(
+    mut stream: TcpStream,
+    request: &str,
+    generation: &AtomicU64,
+) -> Result<(), String> {
+    let key = request
+        .lines()
+        .find_map(|line| {
+            let (name, value) = line.split_once(':')?;
+            name.eq_ignore_ascii_case("sec-websocket-key")
+                .then(|| value.trim())
+        })
+        .ok_or("WebSocket sin Sec-WebSocket-Key")?;
+    let accept = websocket_accept(key);
+    write!(
+        stream,
+        "HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\n\
+         Connection: Upgrade\r\nSec-WebSocket-Accept: {accept}\r\n\r\n"
+    )
+    .map_err(|error| format!("no se pudo aceptar WebSocket: {error}"))?;
+    stream
+        .set_read_timeout(Some(Duration::from_millis(25)))
+        .map_err(|error| format!("no se pudo configurar WebSocket: {error}"))?;
+
+    let mut last_generation = generation.load(Ordering::Acquire);
+    let mut frame = [0; 512];
+    loop {
+        match stream.read(&mut frame) {
+            Ok(0) => return Ok(()),
+            Ok(size) => {
+                if size >= 2 {
+                    let opcode = frame[0] & 0x0f;
+                    if opcode == 0x8 {
+                        send_frame(&mut stream, 0x8, &[])?;
+                        return Ok(());
+                    }
+                    if opcode == 0x9 {
+                        let masked = frame[1] & 0x80 != 0;
+                        let mut offset = 2;
+                        let payload_size = (frame[1] & 0x7f) as usize;
+                        if payload_size == 126 {
+                            if size < 4 {
+                                continue;
+                            }
+                            offset = 4;
+                        } else if payload_size == 127 {
+                            return Err("WebSocket ping demasiado grande".to_owned());
+                        }
+                        let mask = if masked {
+                            if size < offset + 4 {
+                                continue;
+                            }
+                            let key = [
+                                frame[offset],
+                                frame[offset + 1],
+                                frame[offset + 2],
+                                frame[offset + 3],
+                            ];
+                            offset += 4;
+                            Some(key)
+                        } else {
+                            None
+                        };
+                        if size < offset + payload_size {
+                            continue;
+                        }
+                        let mut payload = frame[offset..offset + payload_size].to_vec();
+                        if let Some(key) = mask {
+                            for (index, byte) in payload.iter_mut().enumerate() {
+                                *byte ^= key[index % key.len()];
+                            }
+                        }
+                        send_frame(&mut stream, 0xA, &payload)?;
+                    }
+                }
+            }
+            Err(error)
+                if error.kind() == ErrorKind::WouldBlock || error.kind() == ErrorKind::TimedOut => {
+            }
+            Err(error) => return Err(format!("error leyendo WebSocket: {error}")),
+        }
+
+        let current = generation.load(Ordering::Acquire);
+        if current != last_generation {
+            last_generation = current;
+            send_frame(&mut stream, 0x1, b"reload")?;
+        }
+    }
+}
+
+fn websocket_accept(key: &str) -> String {
+    let mut hasher = Sha1::new();
+    hasher.update(key.as_bytes());
+    hasher.update(b"258EAFA5-E914-47DA-95CA-C5AB0DC85B11");
+    base64::engine::general_purpose::STANDARD.encode(hasher.finalize())
+}
+
+fn send_frame(stream: &mut TcpStream, opcode: u8, payload: &[u8]) -> Result<(), String> {
+    if payload.len() > 125 {
+        return Err("mensaje WebSocket supera el tamano permitido".to_owned());
+    }
+    stream
+        .write_all(&[0x80 | opcode, payload.len() as u8])
+        .and_then(|_| stream.write_all(payload))
+        .map_err(|error| format!("no se pudo enviar WebSocket: {error}"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::websocket_accept;
+
+    #[test]
+    fn computes_rfc6455_accept_key() {
+        assert_eq!(
+            websocket_accept("dGhlIHNhbXBsZSBub25jZQ=="),
+            "s3pPLMBiTxaQ9kYGzzhZRbK+xOo="
+        );
+    }
 }
 
 fn render_route(root: &Path, route: &str) -> Result<String, (u16, String)> {
@@ -154,7 +359,12 @@ fn render_route(root: &Path, route: &str) -> Result<String, (u16, String)> {
     })?;
     let program = parser::parse(&source)
         .map_err(|error| (422, format!("Error en {}: {error}", file.display())))?;
-    Ok(compiler::compile(&program))
+    let scope = if route.is_empty() {
+        "/".to_owned()
+    } else {
+        format!("/{}", route.replace('\\', "/"))
+    };
+    Ok(compiler::compile_with_scope(&program, &scope))
 }
 
 fn serve_public_file(stream: &mut TcpStream, root: &Path, relative: &str) -> Result<(), String> {
@@ -178,6 +388,8 @@ fn serve_public_file(stream: &mut TcpStream, root: &Path, relative: &str) -> Res
         Some("png") => "image/png",
         Some("svg") => "image/svg+xml",
         Some("ico") => "image/x-icon",
+        Some("wasm") => "application/wasm",
+        Some("json") => "application/json",
         _ => "application/octet-stream",
     };
     respond_bytes(stream, 200, content_type, &content)
